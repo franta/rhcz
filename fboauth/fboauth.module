@@ -1,0 +1,170 @@
+<?php
+
+/**
+ * @file
+ * Used to login throught Facebook
+ */
+
+/**
+ * Implementation of hook_install().
+ * fboauth - page for catch redirects from Facebook
+ * admin/settings/fboauth - settings for app id and secret
+ */
+function fboauth_menu() {
+  $items['fboauth'] = array(
+    'title' => 'Facebook connect',
+    'page callback' => 'fboauth_login',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/settings/fboauth'] = array(
+    'title' => t('FBOAuth settings'),
+    'page callback' => 'fboauth_settings',
+    'access arguments' => array('administer users'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/**
+ * serve fboauth page whitch get code parameter from Facebook and create or login user
+ */
+function fboauth_login() {
+  $id = variable_get('fboauth_id', '');
+  $secret = variable_get('fboauth_secret', '');
+  if ($id and $secret) {
+    $access_token=$_REQUEST["code"];
+    global $base_url;
+    $token_url = "https://graph.facebook.com/oauth/access_token?client_id=" . $id . "&redirect_uri=" . urlencode($base_url . "/?q=fboauth&destination=".urlencode($_REQUEST["destination"])) . "&client_secret=" . $secret . "&code=" . $_REQUEST["code"];
+    $access_token = file_get_contents($token_url);
+    if ($access_token) {
+      $graph_url = "https://graph.facebook.com/me?" . $access_token;
+      $fbuser = json_decode(file_get_contents($graph_url));
+      $query = "SELECT uid FROM {fboauth_users} where fbid = %d";
+      $uid = db_result(db_query($query, $fbuser->id));
+      if ($uid) {
+        $account = user_load($uid);
+        user_external_login($account);
+        drupal_goto('/'.$_REQUEST["destination"]);
+      } else {
+        if (user_is_logged_in()) {
+          $query = 'INSERT INTO {fboauth_users} (uid, fbid) VALUES (%d, %d)';
+          db_query($query, user_uid_optional_to_arg(NULL), $fbuser->id);
+          drupal_goto('/'.$_REQUEST["destination"]);
+        } else if (variable_get('user_register', 1)) {  //register new user only if its allowed
+          $user = _create_user($fbuser);
+          $account = user_load($user->uid);
+          user_external_login($account);
+          drupal_goto('/'.$_REQUEST["destination"]);
+        }
+      }
+    }
+  }
+  drupal_goto('/'); // available only with error
+}
+
+/**
+ * create new user, call from fboauth_login
+ */
+function _create_user($fbuser) {
+  $query = "SELECT uid FROM {users} WHERE name = '%s'";
+  $uid = db_result(db_query($query, $fbuser->name));
+  $i = 0;
+  while ($uid) {
+    $i++;
+    $uid = db_result(db_query($query, $fbuser->name.' '.$i));
+  }
+  if ($i>0) {
+    $fbuser->name=$fbuser->name.' '.$i;
+  }
+  $path = file_create_path('fboauth');
+  file_check_directory($path, FILE_CREATE_DIRECTORY);
+  $picture = file_get_contents('https://graph.facebook.com/'.$fbuser->id.'/picture');
+  $file=fopen($path.'/'.$fbuser->id.'.jpg',"w");
+  fwrite($file, $picture);
+  fclose($file);
+  $account = array(
+    'name' => $fbuser->name,
+    'mail' => $fbuser->email,
+    'status' => 1,
+    'picture' => $path.'/'.$fbuser->id.'.jpg',
+    );
+  $user = user_save(NULL, $account);
+  $query = 'INSERT INTO {fboauth_users} (uid, fbid) VALUES (%d, %d)';
+  if ($user->uid) {
+    db_query($query, $user->uid, $fbuser->id);
+  }
+  return $user;
+}
+
+/**
+ * Implementation of hook_block().
+ * if everything is ok and user is not connected from facebook, shov connect button in block
+ */
+function fboauth_block($op = 'list', $delta = '', $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[0] = array(
+        'info'       => t('Facebook login'),
+      );
+      return $blocks;
+    case 'view':
+      global $base_url;
+      $id = variable_get('fboauth_id', '');
+      $secret = variable_get('fboauth_secret', '');
+      $query = "SELECT fbid FROM {fboauth_users} where uid = %d";
+      $uid = db_result(db_query($query, user_uid_optional_to_arg(NULL)));
+      if (! $uid) {
+        if ($id and $secret) {
+          $block['content'] = '<a href="https://www.facebook.com/dialog/oauth?client_id='.$id.'&amp;redirect_uri='.urlencode($base_url.'/?q=fboauth&'.drupal_get_destination()).'&amp;scope=email"><img src="http://static.ak.fbcdn.net/images/fbconnect/login-buttons/connect_light_medium_short.gif" alt="fblogin" /></a>';
+        } else {
+          $block['content'] = t('Please set up App ID and App secret first.');
+        }
+      }
+      return $block;
+  }
+}
+/**
+ * serve admin/settings/fboauth page
+ */
+function fboauth_settings() {
+  return drupal_get_form('fboauth_settings_form');
+}
+
+/**
+ * define settings form
+ */
+function fboauth_settings_form($context) {
+  $form = array();
+  $form['fboauth']['fboauth_id'] = array(
+    '#type' => 'textfield',
+    '#title' => t('App ID'),
+    '#size' => 50,
+    '#maxlengh' => 50,
+    '#description' => t('App ID'),
+    '#value' => variable_get('fboauth_id', ''),
+
+  );
+  $form['fboauth']['fboauth_secret'] = array(
+    '#type' => 'textfield',
+    '#title' => t('App Secret'),
+    '#size' => 50,
+    '#maxlengh' => 50,
+    '#description' => t('App Secret'),
+    '#value' => variable_get('fboauth_secret', ''),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
+}
+
+/**
+ * save form variables
+ */
+function fboauth_settings_form_submit($form, &$form_state) {
+  variable_set('fboauth_id', $form_state['clicked_button']['#post']['fboauth_id']);
+  variable_set('fboauth_secret', $form_state['clicked_button']['#post']['fboauth_secret']);
+}
+
