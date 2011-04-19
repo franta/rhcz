@@ -21,7 +21,7 @@
         </div>
         <div class="grid_1"> <!-- search filler --></div>
         <div class="grid_5" id="site-heading-rh">
-            <a href="http://redhat.com">Komunitní projekt Red Hatu<img id="rh-community" src="/<?php print path_to_theme(); ?>/images/sponsors/redhat-community.png" alt="RedHat" /></a>
+            <a href="http://redhat.com">Komunitní projekt Red Hatu<img id="rh-community" src="/themes/fedoraproject/images/sponsors/redhat-community.png" alt="RedHat" /></a>
         </div>
         <div class="clear"></div>
     </div>
