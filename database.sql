@@ -66,8 +66,8 @@ INSERT INTO `blocks_roles` (`module`, `delta`, `rid`) VALUES
 --
 
 INSERT INTO `boxes` (`bid`, `body`, `info`, `format`) VALUES
-(2, '<a href="/node/add/project">Vytvořit nový projekt</a>, <a href="/admin/content/taxonomy/2">Vytvořit novou školu</a>, <a href="/admin/content/taxonomy/3">Vytvořit novou kategorii</a>', 'Vytvořit nový projekt', 1),
-(3, '<a href="/node/add/events">Vytvořit novou událost</a>', 'Vytvořit novou událost', 1);
+(2, '<a href="node/add/project">Vytvořit nový projekt</a>, <a href="admin/content/taxonomy/2">Vytvořit novou školu</a>, <a href="admin/content/taxonomy/3">Vytvořit novou kategorii</a>', 'Vytvořit nový projekt', 1),
+(3, '<a href="node/add/events">Vytvořit novou událost</a>', 'Vytvořit novou událost', 1);
 
 -- --------------------------------------------------------
 
@@ -1395,6 +1395,8 @@ INSERT INTO `users` (`uid`, `name`, `pass`, `mail`, `mode`, `sort`, `threshold`,
 (31, 'bach', '', 'bach@drupal.gajdusek.net', 0, 0, 0, '', '', 0, 1301504397, 1301504397, 0, 0, '7200', 'cs', '', 'bach@drupal.gajdusek.net', 'a:1:{s:13:"form_build_id";s:37:"form-24175c79954fa41af4be1f3127ea4629";}', '');
 
 -- --------------------------------------------------------
+INSERT INTO `users_roles` (`uid`, `rid`) VALUES
+(1, 3);
 
 DELETE FROM `variable` WHERE `name`='content_profile_profile';
 DELETE FROM `variable` WHERE `name`='date_default_timezone';
